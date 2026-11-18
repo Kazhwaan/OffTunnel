@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+dist/
+build/
+*.spec
+# PyInstaller
+*.manifest
+
+# Windows / editor
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+
+# OffTunnel runtime data (per-user, never committed)
+# %LOCALAPPDATA%\OffTunnel\rules.json and iran_snapshot.json live
+# outside the repo; nothing in data/ is ignored except generated
+# snapshots a developer regenerates locally — the shipped snapshot
+# data/countries/ir.json IS committed on purpose.
