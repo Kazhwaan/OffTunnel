@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="OffTunnel logo">
+  <!--
+    OffTunnel logo — original concept, drawn for this project.
+    A tunnel arch (dark) with one road splitting in two:
+      * the straight lane continues INTO the tunnel (VPN, blue)
+      * the branch lane leaves the tunnel and goes OFF it (local traffic, teal/green)
+    No part of this is copied from DirectLane's icon.
+    Colours: tunnel #1B2A4A, VPN lane #2F6FED, local lane #00B39A, background #F4F7FB.
+  -->
+  <rect width="256" height="256" rx="48" fill="#F4F7FB"/>
+  <path d="M48 216 A80 80 0 0 1 208 216 L208 232 L48 232 Z" fill="#1B2A4A"/>
+  <path d="M78 216 A50 50 0 0 1 178 216 L178 232 L78 232 Z" fill="#F4F7FB"/>
+  <!-- VPN lane: straight through the tunnel -->
+  <path d="M128 232 L128 96" stroke="#2F6FED" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <!-- Local lane: branches off the tunnel -->
+  <path d="M128 190 C128 150 170 140 196 108" stroke="#00B39A" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <circle cx="128" cy="88" r="10" fill="#2F6FED"/>
+  <circle cx="202" cy="100" r="10" fill="#00B39A"/>
+  <circle cx="128" cy="190" r="8" fill="#1B2A4A"/>
+</svg>
