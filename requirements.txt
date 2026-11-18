@@ -1,0 +1,2 @@
+# OffTunnel runtime: standard library only. No runtime dependencies.
+# (This file is intentionally empty apart from this comment.)
