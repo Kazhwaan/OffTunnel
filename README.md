@@ -26,9 +26,13 @@ on again — and you can also add any domain, IP or CIDR manually.
 
 | Feature | How |
 |---|---|
-| **Iran pack (default)** | All Iran IPv4 ranges, from RIPE delegated stats, merged to CIDRs, routed via the regular gateway |
+| **One big button** | Home tab: **Protect Iran traffic** applies the Iran pack + your rules, then *verifies* against the route table and shows **Protected** (green) / **Not protected** (red) |
+| **Proof it works** | **Test now** on the Home tab checks a real Iranian site and IP: your public IP (VPN IP), the route it takes, ping, and a plain **PASS / FAIL** |
+| **Iran pack (default)** | All Iran IPv4 ranges, from RIPE delegated stats, merged to CIDRs, routed via the regular gateway — visible as a searchable list on the Rules tab |
 | **Auto-update** | Checks RIPE frequently; applies **only the diff** when the list changes (see below) |
-| **Manual rules** | Add a domain (its current IPs are resolved by DNS), a single IP, or a CIDR — inspect, refresh, remove |
+| **Manual rules** | Add a domain (its current IPs are resolved by DNS), a single IP, or a CIDR — inspect, refresh, remove (removing a rule removes its routes) |
+| **System tray** | Close minimises to the tray, protection keeps running; tray menu: Show / Apply / Exit |
+| **Admin by default** | The exe asks for Administrator when you double-click it; if it somehow starts without admin, it offers to restart elevated |
 | **Any VPN** | Detects the VPN from Windows interface names; no VPN client API, no assumption about which client you use |
 | **Lightweight** | Python stdlib only at runtime, no kernel driver, no background packet interception in v1 |
 
@@ -51,12 +55,11 @@ exactly that route again.
 ### Why the Iran list is not "one route per IP"
 
 Iran has about **10.84 million IPv4 addresses**. Verified live on
-2026-11-18 against the RIPE file dated 2026-11-17:
+2026-11-19 against the RIPE file:
 
-- **1,970** delegated IR rows (allocated + assigned)
-- **10,840,320** addresses in total
-- **1,973** CIDRs after expanding each row to its address range
-- **1,748** merged CIDRs after collapsing adjacent networks
+- **1,972** delegated IR rows (allocated + assigned)
+- **10,840,832** addresses in total
+- **1,749** merged CIDRs after collapsing adjacent networks
 
 OffTunnel ships that merged list as `data/countries/ir.json` so a
 fresh install works offline, then re-checks RIPE at runtime.
@@ -115,9 +118,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
 That creates `dist\OffTunnel\OffTunnel.exe` (portable) and a
-single-file `dist\OffTunnel.exe`. **Run as Administrator** to change
-Windows routes — without admin rights the app warns you instead of
-failing silently.
+single-file `dist\OffTunnel.exe`. The exe has the OffTunnel icon
+and **requests Administrator (UAC) when you double-click it** —
+no need to right-click "Run as administrator" (though that still
+works). Without admin rights the app cannot change Windows
+routes, and it says so plainly instead of failing silently.
 
 **Tests (also run on Linux, in dry-run mode):**
 
@@ -131,6 +136,8 @@ py -3 -m unittest discover -s tests -v
 python -m offtunnel status
 python -m offtunnel apply --dry-run
 python -m offtunnel refresh
+python -m offtunnel verify        # Protected or Not protected, from the route table
+python -m offtunnel test snapp.ir # route + ping for one Iranian target, PASS/FAIL
 python -m offtunnel rules add domain snapp.ir
 python -m offtunnel rules list
 ```
@@ -138,18 +145,34 @@ python -m offtunnel rules list
 ## Usage
 
 1. Connect your VPN as normal.
-2. Open OffTunnel **as Administrator**.
-3. **Iran pack** tab: click *Apply Iran pack*. Iranian IPs now go
-   direct; everything else stays on the VPN.
-4. If an Iranian site still goes through the VPN, add it on the
-   **Manual rules** tab as a domain — see "Iranian sites hosted
-   abroad" below.
-5. Leave OffTunnel running (or re-run it) for auto-updates; it
-   only touches routes when the RIPE list actually changes.
+2. Open OffTunnel. It asks for Administrator (UAC) — accept.
+   The Home tab shows **Not protected** in red, which VPN it
+   detected, and your regular gateway.
+3. Click the big green **Protect Iran traffic** button. The banner
+   turns green: **✓ Protected** — verified against the Windows
+   route table, not just claimed.
+4. Click **Test now** to prove it: it checks a real Iranian site
+   (`snapp.ir`) and a real Iranian IP, shows your public IP (your
+   VPN IP — other sites still use the VPN), the direct route and
+   the ping, and a **PASS / FAIL** line.
+5. If an Iranian site still goes through the VPN, add it on the
+   **Rules** tab as a domain — see "Iranian sites hosted
+   abroad" below. The Iran CIDRs are listed there too, searchable,
+   with the count.
+6. Closing the window minimises OffTunnel to the system tray —
+   protection keeps running. Double-click the tray icon to bring
+   it back; choose **Exit** from the tray menu to stop protection
+   (it removes the routes first, if that setting is on).
+7. Leave OffTunnel running for auto-updates; it only touches
+   routes when the RIPE list actually changes. Settings (tray,
+   update interval, Iran pack on/off) are on the **Settings** tab
+   and save automatically.
 
 Settings and data live in `%LOCALAPPDATA%\OffTunnel\`:
 
 - `rules.json` — your manual rules
+- `settings.json` — your settings (tray, interval, Iran pack on/off)
+- `applied.json` — the routes OffTunnel applied (so removal is exact)
 - `iran_snapshot.json` — the last applied Iran snapshot + its SHA-256
 
 ## VPN compatibility
@@ -228,12 +251,24 @@ offtunnel/
   vpn.py                 # VPN interface detection + per-client caveats
   rules.py               # manual domain/IP/CIDR rules (JSON store)
   updater.py             # background timer: hash-check, diff-only apply
-  gui.py                 # tkinter GUI (Iran pack / Manual rules / Status)
-  cli.py                 # headless CLI: status / apply / refresh / rules
+  settings.py            # persisted user settings (tray, interval, …)
+  admin.py               # admin detection + elevated relaunch (UAC)
+  apply.py               # apply/remove Iran pack + rules, applied-state file
+  verify.py              # route-table verification, target check, ping, public IP
+  tray.py                # Windows system-tray icon (ctypes) + state machine
+  icon.py                # embedded window icon (base64 PNG)
+  gui.py                 # tkinter GUI (Home / Rules / Settings / Status & log)
+  cli.py                 # headless CLI: status / apply / refresh / verify / test / rules
 data/
   countries/ir.json      # shipped Iran snapshot (merged CIDRs)
   catalog_ir.json        # starter Iranian domain catalog (manual rules)
 assets/logo.svg          # original OffTunnel logo (tunnel + branching lane)
+assets/logo.ico          # app icon for the exe (9 sizes, 16–256px) — generated, see below
+assets/logo.png          # app icon, 256px PNG — generated, see below
+assets/logo.ico.b64      # base64 source of logo.ico (binaries are stored as text:
+assets/logo.png.b64      # the GitHub contents API only accepts text files)
+scripts/generate_icons.py  # decodes the .b64 files back to .ico/.png (stdlib only)
+OffTunnel.spec           # PyInstaller spec (--icon, --uac-admin)
 tests/                   # unittest, stdlib only — run on any OS in dry-run
 scripts/fetch_iran_ranges.py  # regenerate data/countries/ir.json from RIPE
 build.ps1                # PyInstaller build (portable + single-file)
