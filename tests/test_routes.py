@@ -69,14 +69,31 @@ class TestRoutes(unittest.TestCase):
         gw = ipaddress.IPv4Address("192.168.1.1")
         old = [ipaddress.IPv4Network("10.0.0.0/24")]
         new = [ipaddress.IPv4Network("10.0.0.0/24"), ipaddress.IPv4Network("10.0.1.0/24")]
-        added, removed = ex.apply_diff(old, new, gw)
+        added, removed, failed = ex.apply_diff(old, new, gw)
         self.assertEqual(added, [ipaddress.IPv4Network("10.0.1.0/24")])
         self.assertEqual(removed, [])
+        self.assertEqual(failed, [])
         self.assertEqual(len(ex.executed), 1)  # only the new network
         # No change -> no commands at all.
         ex2 = RouteExecutor(dry_run=True)
-        ex2.apply_diff(old, old, gw)
+        added2, removed2, failed2 = ex2.apply_diff(old, old, gw)
+        self.assertEqual((added2, removed2, failed2), ([], [], []))
         self.assertEqual(ex2.executed, [])
+
+    def test_apply_diff_reports_failures(self):
+        # A non-dry-run executor on Linux is forced to dry-run, so
+        # simulate a failure with a subclass that returns non-zero.
+        class Failing(RouteExecutor):
+            def run(self, cmd):
+                self.executed.append(list(cmd))
+                return 1
+
+        ex = Failing(dry_run=False)
+        gw = ipaddress.IPv4Address("192.168.1.1")
+        added, removed, failed = ex.apply_diff([], [ipaddress.IPv4Network("10.0.0.0/24")], gw)
+        self.assertEqual(added, [])
+        self.assertEqual(len(failed), 1)
+        self.assertIn("10.0.0.0/24", failed[0])
 
 
 if __name__ == "__main__":
