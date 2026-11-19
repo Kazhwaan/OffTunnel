@@ -151,14 +151,29 @@ class RouteExecutor:
         old: Sequence[IPv4Network],
         new: Sequence[IPv4Network],
         gateway: IPv4Address,
-    ) -> tuple[list[IPv4Network], list[IPv4Network]]:
-        """Add only new networks, delete only removed ones. Returns (added, removed)."""
+    ) -> tuple[list[IPv4Network], list[IPv4Network], list[str]]:
+        """Add only new networks, delete only removed ones.
+
+        Returns ``(added, removed, failed)`` — ``failed`` holds one
+        plain-language line per ``route`` command that returned a
+        non-zero exit code. v0.1.0 ignored those return codes and
+        reported success anyway; callers must show failures.
+        """
         added, removed = diff_networks(old, new)
+        failed: list[str] = []
+        done_added: list[IPv4Network] = []
+        done_removed: list[IPv4Network] = []
         for net in removed:
-            self.delete_route(net, gateway)
+            if self.delete_route(net, gateway) == 0:
+                done_removed.append(net)
+            else:
+                failed.append(f"Could not remove route {net} (route delete failed)")
         for net in added:
-            self.add_route(net, gateway)
-        return added, removed
+            if self.add_route(net, gateway) == 0:
+                done_added.append(net)
+            else:
+                failed.append(f"Could not add route {net} (route add failed)")
+        return done_added, done_removed, failed
 
 
 def current_routes() -> list[Route]:
