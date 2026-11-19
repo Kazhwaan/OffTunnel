@@ -124,3 +124,42 @@ def parse_route_print_interfaces(text: str) -> list[str]:
             if m and m.group(1):
                 names.append(m.group(1))
     return names
+
+
+def parse_ipconfig_interfaces(text: str) -> list[tuple[str, str]]:
+    """Map adapter names to IPv4 addresses from ``ipconfig`` output.
+
+    ``route print`` alone cannot tell which interface IP belongs to
+    a VPN adapter (it lists names and IPs in different sections).
+    ``ipconfig`` lists them together: an adapter heading followed
+    by its "IPv4 Address" line. This is how OffTunnel finds the
+    VPN interface IPs, so the regular gateway is never the VPN's
+    own default route.
+    """
+    import ipaddress
+
+    pairs: list[tuple[str, str]] = []
+    current_name: str | None = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        # Adapter heading, e.g. "NordLynx adapter NordLynx:" or
+        # "Wireless LAN adapter Wi-Fi:" — take the text after "adapter".
+        if "adapter" in stripped.lower() and stripped.endswith(":"):
+            after = stripped.split("adapter", 1)[1].strip().rstrip(":").strip()
+            current_name = after or None
+            continue
+        if current_name:
+            m = re.search(r"IPv4 Address[^:]*:\s*(\d+\.\d+\.\d+\.\d+)", stripped)
+            if m:
+                try:
+                    ipaddress.IPv4Address(m.group(1))
+                except ValueError:
+                    continue
+                pairs.append((current_name, m.group(1)))
+                current_name = None
+    return pairs
+
+
+def vpn_interface_ips(pairs: list[tuple[str, str]]) -> list[str]:
+    """Interface IPs whose adapter name is a known VPN/tunnel name."""
+    return [ip for name, ip in pairs if is_vpn_interface(name)]
