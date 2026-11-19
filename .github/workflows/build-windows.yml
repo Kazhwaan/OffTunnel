@@ -58,6 +58,7 @@ jobs:
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.1' }}
           name: OffTunnel ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.1' }}
+          files: dist/OffTunnel.exe
           body: |
             OffTunnel — Windows VPN split tunneling. Local traffic goes off the tunnel.
 
