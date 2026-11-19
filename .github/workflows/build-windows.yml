@@ -58,7 +58,6 @@ jobs:
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.1' }}
           name: OffTunnel ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.1' }}
-          files: dist/OffTunnel.exe
           body: |
             OffTunnel — Windows VPN split tunneling. Local traffic goes off the tunnel.
 
@@ -66,3 +65,7 @@ jobs:
             Manual domain / IP / CIDR rules are supported too.
 
             Download OffTunnel.exe below and run it as Administrator.
+            See README.md for usage and VPN compatibility notes.
+          files: dist/OffTunnel.exe
+          draft: false
+          prerelease: false
