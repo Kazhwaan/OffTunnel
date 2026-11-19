@@ -5,7 +5,9 @@ __pycache__/
 venv/
 dist/
 build/
-*.spec
+# NOTE: OffTunnel.spec is a hand-written build file and IS committed
+# on purpose (it carries --icon and --uac-admin). PyInstaller's
+# auto-generated spec files are not used in this repo.
 # PyInstaller
 *.manifest
 
