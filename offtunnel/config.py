@@ -14,7 +14,7 @@ from __future__ import annotations
 
 APP_NAME = "OffTunnel"
 APP_SLUG = "offtunnel"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.1.1"
 # Storage folder name under %LOCALAPPDATA% / ~/.config — keep in sync
 # with APP_NAME so users can find their rules/snapshot by app name.
 DATA_DIR_NAME = "OffTunnel"
