@@ -6,9 +6,19 @@ does expensive work when the source actually changed:
   1. Fetch the RIPE file (or fail quietly and retry next time; a
      failed fetch must never remove existing routes).
   2. Compare its SHA-256 with the last applied snapshot.
-  3. If identical: do nothing. Log one line, sleep.
+  3. If identical: **does nothing** — no route is touched.
   4. If different: parse, diff against the applied snapshot, apply
      only the added/removed networks, save the new snapshot.
+
+v0.1.1 fixes (found by testing v0.1.0):
+  * First run with no network: the fetch failed and nothing was
+    applied, even though a shipped snapshot exists. Now a failed
+    fetch falls back to the shipped snapshot.
+  * Manual rules were never applied by the updater. Now
+    ``check_once`` applies Iran pack *and* enabled manual rules
+    (via ``apply.apply_all``).
+  * Route failures were ignored. Now ``CheckResult.failed`` lists
+    them and ``changed`` is False when nothing actually changed.
 
 Default check interval is 15 minutes. That is frequent enough that
 a daily RIPE change is picked up the same day, and cheap enough
@@ -25,15 +35,18 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
+from .apply import apply_all, effective_snapshot
 from .cidr import diff_networks
 from .iran_ranges import (
     RangeSnapshot,
     fetch_country_snapshot,
     load_snapshot,
     save_snapshot,
+    shipped_snapshot_path,
     snapshot_path,
 )
 from .routes import RouteExecutor
+from .rules import RuleStore
 
 LogFn = Callable[[str], None]
 
@@ -46,6 +59,7 @@ class CheckResult:
     total_networks: int = 0
     total_addresses: int = 0
     error: str = ""
+    failed: list[str] | None = None
 
 
 def check_once(
@@ -53,23 +67,58 @@ def check_once(
     gateway: str | None,
     log: LogFn = print,
     country: str = "IR",
+    store: RuleStore | None = None,
 ) -> CheckResult:
     """One update cycle. Returns what happened; never raises on fetch failure."""
+    from ipaddress import IPv4Address
+
     path = snapshot_path()
     old_snapshot = load_snapshot(path)
     try:
         new_snapshot = fetch_country_snapshot(country)
     except Exception as exc:  # noqa: BLE001 - network failure is expected sometimes
         log(f"[updater] fetch failed, keeping current routes: {exc}")
-        return CheckResult(changed=False, error=str(exc))
+        # Fall back to the shipped snapshot on first run: a fresh
+        # install with no network must still protect something.
+        fallback = effective_snapshot()
+        if fallback is not None and old_snapshot is None and gateway:
+            log("[updater] Using the shipped Iran snapshot (offline first run).")
+            store = store or RuleStore()
+            report = apply_all(executor, IPv4Address(gateway), fallback, store)
+            save_snapshot(fallback, path)
+            return CheckResult(
+                changed=bool(report.added),
+                added=len(report.added),
+                removed=len(report.removed),
+                total_networks=len(fallback.networks),
+                total_addresses=fallback.total_addresses,
+                error=str(exc),
+                failed=report.failed,
+            )
+        return CheckResult(changed=False, error=str(exc), failed=[])
 
     old_networks = old_snapshot.networks if old_snapshot else []
     if old_snapshot and old_snapshot.source_sha256 == new_snapshot.source_sha256:
         log("[updater] Iran ranges unchanged — no routes touched.")
+        # Manual rules may still be new/changed: apply only those.
+        # (snapshot=None leaves the Iran pack exactly as it is.)
+        if gateway:
+            store = store or RuleStore()
+            report = apply_all(executor, IPv4Address(gateway), None, store)
+            if report.added or report.removed:
+                return CheckResult(
+                    changed=True,
+                    added=len(report.added),
+                    removed=len(report.removed),
+                    total_networks=len(new_snapshot.networks),
+                    total_addresses=new_snapshot.total_addresses,
+                    failed=report.failed,
+                )
         return CheckResult(
             changed=False,
             total_networks=len(new_snapshot.networks),
             total_addresses=new_snapshot.total_addresses,
+            failed=[],
         )
 
     added, removed = diff_networks(old_networks, new_snapshot.networks)
@@ -77,19 +126,22 @@ def check_once(
         f"[updater] Iran ranges changed: +{len(added)} -{len(removed)} networks, "
         f"{len(new_snapshot.networks)} total, {new_snapshot.total_addresses:,} addresses."
     )
+    failed: list[str] = []
     if gateway:
-        from ipaddress import IPv4Address
-
-        executor.apply_diff(old_networks, new_snapshot.networks, IPv4Address(gateway))
+        store = store or RuleStore()
+        report = apply_all(executor, IPv4Address(gateway), new_snapshot, store)
+        added, removed = report.added, report.removed
+        failed = report.failed
     else:
         log("[updater] No regular gateway known — snapshot saved, routes not applied.")
     save_snapshot(new_snapshot, path)
     return CheckResult(
-        changed=True,
+        changed=bool(added or removed),
         added=len(added),
         removed=len(removed),
         total_networks=len(new_snapshot.networks),
         total_addresses=new_snapshot.total_addresses,
+        failed=failed,
     )
 
 
