@@ -28,14 +28,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-build.txt
 
+      - name: Generate icon files
+        run: python scripts/generate_icons.py
+
       - name: Run tests
         run: python -m unittest discover -s tests -v
 
       - name: Build portable exe
-        run: pyinstaller --noconfirm --clean --noconsole --name OffTunnel --add-data "data;data" offtunnel.pyw
+        run: pyinstaller --noconfirm --clean --noconsole --name OffTunnel --uac-admin --add-data "data;data" --add-data "assets;assets" --icon assets/logo.ico offtunnel.pyw
 
       - name: Build single-file exe
-        run: pyinstaller --noconfirm --clean --noconsole --onefile --name OffTunnel --add-data "data;data" offtunnel.pyw
+        run: pyinstaller --noconfirm --clean --noconsole --onefile --name OffTunnel --uac-admin --add-data "data;data" --add-data "assets;assets" --icon assets/logo.ico offtunnel.pyw
 
       - name: Upload exe as workflow artifact
         uses: actions/upload-artifact@v4
@@ -48,13 +51,13 @@ jobs:
       # The MCP GitHub connector has no create-tag / create-release tool,
       # so the release is created here, from the Windows runner, using the
       # workflow's own GITHUB_TOKEN. On a push to main this creates tag
-      # v0.1.0 (if it does not exist yet) and attaches the single-file exe.
+      # v0.1.1 (if it does not exist yet) and attaches the single-file exe.
       # On a v* tag push it releases that tag instead.
       - name: Create GitHub Release with the exe
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.0' }}
-          name: OffTunnel ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.0' }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.1' }}
+          name: OffTunnel ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.1' }}
           body: |
             OffTunnel — Windows VPN split tunneling. Local traffic goes off the tunnel.
 
@@ -62,7 +65,3 @@ jobs:
             Manual domain / IP / CIDR rules are supported too.
 
             Download OffTunnel.exe below and run it as Administrator.
-            See README.md for usage and VPN compatibility notes.
-          files: dist/OffTunnel.exe
-          draft: false
-          prerelease: false
